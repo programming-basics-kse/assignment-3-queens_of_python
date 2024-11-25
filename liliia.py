@@ -1,7 +1,4 @@
 import sys
-
-from playground import country
-
 if len(sys.argv) < 3:
     print("Недостатньо аргументів. Формат:\n"
           "1. olympics.py data.csv -medals Країна Рік [-output Файл]\n"
@@ -53,7 +50,6 @@ if option == '-medals':
     if output_file:
         with open(output_file, 'w') as file:
             file.write(result)
-
 elif option == '-total':
     if len(sys.argv) < 4:
         print("Недостатньо аргументів. Формат: olympics.py data.csv -total Year")
@@ -90,6 +86,53 @@ elif option == '-total':
         result_lines.append(f"{country} - Gold: {counts['Gold']}, Silver: {counts['Silver']}, Bronze: {counts['Bronze']}")
     result = "\n".join(result_lines)
     print(result)
+
+
+elif option == '-overall':
+    if len(sys.argv) < 4:
+        print("Недостатньо аргументів. Формат: olympics.py data.csv -overall Країна1 Країна2 ...")
+        sys.exit(1)
+    countries = sys.argv[3:]
+    country_years = {country: {} for country in countries}
+
+    with open(file_path, 'rt') as file:
+        next(file)
+        for line in file:
+            line = line[:-1]
+            split = line.split("\t")
+            id_ = split[0]
+            name = split[1]
+            sex = split[2]
+            age = split[3]
+            height = split[4]
+            weight = split[5]
+            team = split[6]
+            noc = split[7]
+            games = split[8]
+            year_col = split[9]
+            season = split[10]
+            city = split[11]
+            sport = split[12]
+            event = split[13]
+            medal = split[14]
+            if medal != "NA":
+                for country in countries:
+                    if team == country or noc == country:
+                        if year_col not in country_years[country]:
+                            country_years[country][year_col] = 0
+                        country_years[country][year_col] += 1
+
+    result_lines = []
+    for country, years in country_years.items():
+        if years:
+            max_year = max(years, key=years.get)
+            max_count = years[max_year]
+            result_lines.append(f"{country} - {max_year} ({max_count} медалей)")
+        else:
+            result_lines.append(f"{country} - Немає медалей")
+
+    result = "\n".join(result_lines)
+    print(result)
 else:
-    print("Другий аргумент має бути -medals або -total")
+    print("Другий аргумент має бути -medals, -total або -overall")
     sys.exit(1)

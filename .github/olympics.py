@@ -80,6 +80,39 @@ def process_total(args, countries_data):
 
     write_output(args.output, result)
 
+def process_interactive(args, countries_data):
+    while True:
+        country_input = input("Введіть назву країни (або 'exit' для виходу): ")
+        if country_input.lower() == 'exit':
+            break
+
+        if country_input in countries_data:
+            country_years = countries_data[country_input]
+            first_participation = min(country_years, key=lambda x: x[0])
+            print(f"Перша участь {country_input}: Рік {first_participation[0]}")
+
+            medal_count = defaultdict(int)
+            for year, medal, _, _ in country_years:
+                medal_count[year] += 1
+            best_year = max(medal_count, key=medal_count.get)
+            print(f"Найуспішніший рік для {country_input}: {best_year} з {medal_count[best_year]} медалями")
+
+            worst_year = min(medal_count, key=medal_count.get)
+            print(f"Найгірший рік для {country_input}: {worst_year} з {medal_count[worst_year]} медалями")
+
+            medal_types = {'Gold': 0, 'Silver': 0, 'Bronze': 0}
+            for _, medal, _, _ in country_years:
+                if medal == 'Gold':
+                    medal_types['Gold'] += 1
+                elif medal == 'Silver':
+                    medal_types['Silver'] += 1
+                elif medal == 'Bronze':
+                    medal_types['Bronze'] += 1
+            total_years = len(set(year for year, _, _, _ in country_years))
+            print(f"Середня кількість медалей за рік для {country_input}: Золото: {medal_types['Gold'] / total_years:.2f}, Срібло: {medal_types['Silver'] / total_years:.2f}, Бронза: {medal_types['Bronze'] / total_years:.2f}")
+        else:
+            print(f"Країна'{country_input}' не знайдено в даних.")
+
 def main():
     parser = argparse.ArgumentParser(description="Олімпійські медалі: пошук та статистика")
     parser.add_argument("file", help="Шлях до файлу з даними")
@@ -95,6 +128,9 @@ def main():
     total_parser.add_argument("year", help="Рік Олімпіади")
     total_parser.add_argument("-output", help="Файл для виведення результатів")
     total_parser.set_defaults(func=process_total)
+
+    interactive_parser = subparsers.add_parser("interactive", help="Запустити інтерактивний режим")
+    interactive_parser.set_defaults(func=process_interactive)
 
     args = parser.parse_args()
     countries_data = load_data(args.file)

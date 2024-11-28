@@ -1,211 +1,105 @@
-import sys
-if len(sys.argv) < 3:
-    print("Недостатньо аргументів. Формат:\n"
-          "1. olympics.py athlete_events.tsv -medals Країна Рік [-output Файл]\n"
-          "2. olympics.py athlete_events.tsv -total Рік\n"
-          "3. olympics.py athlete_events.tsv -overall Країна1 Країна2 ...\n"
-          "4. olympics.py athlete_events.tsv -interactive")
-    sys.exit(1)
-file_path = sys.argv[1]
-option = sys.argv[2]
-if option == '-medals':
-    if len(sys.argv) < 5:
-        print("Недостатньо аргументів. Формат: olympics.py athlete_events.tsv -medals Країна Рік [-output Файл]")
-        sys.exit(1)
-    country = sys.argv[3]
-    year = sys.argv[4]
-    output_file = None
-    if len(sys.argv) > 5 and sys.argv[5] == "-output":
-        if len(sys.argv) < 7:
-            print("Вкажіть ім'я файлу після -output")
-            sys.exit(1)
-        output_file = sys.argv[6]
-    medals = {"Gold": 0, "Silver": 0, "Bronze": 0}
-    medalists = []
-    with open(file_path, 'rt') as file:
-        next(file)
-        for line in file:
-            line = line[:-1]
-            split = line.split("\t")
-            id_ = split[0]
-            name = split[1]
-            sex = split[2]
-            age = split[3]
-            height = split[4]
-            weight = split[5]
-            team = split[6]
-            noc = split[7]
-            games = split[8]
-            year_col = split[9]
-            season = split[10]
-            city = split[11]
-            sport = split[12]
-            event = split[13]
-            medal = split[14]
-            if year_col == year and (team == country or noc == country):
-                if medal != "NA":  # Тільки медалісти
-                    medalists.append(f"{name} - {sport} - {medal}")
-                    medals[medal] += 1
-    result = "\n".join(medalists[:10]) + "\n"
-    result += f"Gold: {medals['Gold']}, Silver: {medals['Silver']}, Bronze: {medals['Bronze']}"
-    print(result)
+import argparse
+import csv
+from collections import defaultdict
+
+def write_output(output_file, result):
     if output_file:
-        with open(output_file, 'w') as file:
-            file.write(result)
-elif option == '-total':
-    if len(sys.argv) < 4:
-        print("Недостатньо аргументів. Формат: olympics.py data.csv -total Year")
-        sys.exit(1)
-    year = sys.argv[3]
-    country_medals = {}
-    with open(file_path, 'rt') as file:
-        next(file)
-        for line in file:
-            line = line[:-1]
-            split = line.split("\t")
-            id_ = split[0]
-            name = split[1]
-            sex = split[2]
-            age = split[3]
-            height = split[4]
-            weight = split[5]
-            team = split[6]
-            noc = split[7]
-            games = split[8]
-            year_col = split[9]
-            season = split[10]
-            city = split[11]
-            sport = split[12]
-            event = split[13]
-            medal = split[14]
-            if year_col == year and medal != "NA":
-                country = f"{team} ({noc})"
-                if country not in country_medals:
-                    country_medals[country] = {"Gold": 0, "Silver": 0, "Bronze": 0}
-                country_medals[country][medal] += 1
-    result_lines = []
-    for country, counts in sorted(country_medals.items()):
-        result_lines.append(f"{country} - Gold: {counts['Gold']}, Silver: {counts['Silver']}, Bronze: {counts['Bronze']}")
-    result = "\n".join(result_lines)
-    print(result)
+        with open(output_file, mode='w', encoding='utf-8') as file:
+            file.write("\n".join(result))
+            print(f"Результати були записані в файл {output_file}")
+    else:
+        print("\n".join(result))
 
+def load_data(file_path):
+    countries_data = defaultdict(list)
+    try:
+        with open(file_path, mode='r', encoding='utf-8') as file:
+            reader = csv.DictReader(file, delimiter='\t')
+            for row in reader:
+                country_name = row['Team']
+                country_code = row['NOC']
+                year = row['Year']
+                medal = row['Medal']
+                name = row['Name']
+                sport = row['Sport']
+                if medal != 'NA' and medal != '':
+                    countries_data[country_name].append((year, medal, name, sport))
+                    countries_data[country_code].append((year, medal, name, sport))
+    except FileNotFoundError:
+        print(f"Файл '{file_path}' не знайдений.")
+    return countries_data
 
-elif option == '-overall':
-    if len(sys.argv) < 4:
-        print("Недостатньо аргументів. Формат: olympics.py data.csv -overall Країна1 Країна2 ...")
-        sys.exit(1)
-    countries = sys.argv[3:]
-    country_years = {country: {} for country in countries}
+def process_medals(args, countries_data):
+    medalists = []
+    country_medals = {'Gold': 0, 'Silver': 0, 'Bronze': 0}
 
-    with open(file_path, 'rt') as file:
-        next(file)
-        for line in file:
-            line = line[:-1]
-            split = line.split("\t")
-            id_ = split[0]
-            name = split[1]
-            sex = split[2]
-            age = split[3]
-            height = split[4]
-            weight = split[5]
-            team = split[6]
-            noc = split[7]
-            games = split[8]
-            year_col = split[9]
-            season = split[10]
-            city = split[11]
-            sport = split[12]
-            event = split[13]
-            medal = split[14]
-            if medal != "NA":
-                for country in countries:
-                    if team == country or noc == country:
-                        if year_col not in country_years[country]:
-                            country_years[country][year_col] = 0
-                        country_years[country][year_col] += 1
+    for country, data in countries_data.items():
+        if country == args.country:
+            for year, medal, name, sport in data:
+                if year == args.year:
+                    medalists.append({'name': name, 'sport': sport, 'medal': medal})
+                    if medal == 'Gold':
+                        country_medals['Gold'] += 1
+                    elif medal == 'Silver':
+                        country_medals['Silver'] += 1
+                    elif medal == 'Bronze':
+                        country_medals['Bronze'] += 1
 
-    result_lines = []
-    for country, years in country_years.items():
-        if years:
-            max_year = max(years, key=years.get)
-            max_count = years[max_year]
-            result_lines.append(f"{country} - {max_year} ({max_count} медалей)")
-        else:
-            result_lines.append(f"{country} - Немає медалей")
-
-    result = "\n".join(result_lines)
-    print(result)
-elif option == '-interactive':
-    country_data = {}
-    with open(file_path, 'rt') as file:
-        next(file)
-        for line in file:
-            line = line[:-1]
-            split = line.split("\t")
-            id_ = split[0]
-            name = split[1]
-            sex = split[2]
-            age = split[3]
-            height = split[4]
-            weight = split[5]
-            team = split[6]
-            noc = split[7]
-            games = split[8]
-            year_col = split[9]
-            season = split[10]
-            city = split[11]
-            sport = split[12]
-            event = split[13]
-            medal = split[14]
-            country_key = f"{team} ({noc})"
-            if country_key not in country_data:
-                country_data[country_key] = {}
-            if year_col not in country_data[country_key]:
-                country_data[country_key][year_col] = {
-                    "city": city,
-                    "medals": {"Gold": 0, "Silver": 0, "Bronze": 0}
-                }
-            if medal in {"Gold", "Silver", "Bronze"}:
-                country_data[country_key][year_col]["medals"][medal] += 1
-    print("Введіть країну (назву або код) для перегляду статистики. Введіть 'exit' для виходу.")
-    while True:
-        user_input = input("Країна: ").strip()
-        if user_input.lower() == 'exit':
-            print("Інтерактивний режим завершено.")
+    result = []
+    result.append(f"Топ-10 медалістів з {args.country} на Олімпіаді {args.year}:")
+    count = 0
+    for medalist in medalists:
+        if medalist['medal'] != 'NA':
+            count += 1
+            result.append(f"{count}. {medalist['name']} - {medalist['sport']} - {medalist['medal']}")
+        if count == 10:
             break
 
-        matching_countries = [key for key in country_data.keys() if user_input in key]
-        if not matching_countries:
-            print(f"Країна '{user_input}' не знайдена. Спробуйте ще раз.")
-            continue
+    result.append("\nЗагальна кількість медалей для країни:")
+    result.append(f"Золото: {country_medals['Gold']}, Срібло: {country_medals['Silver']}, Бронза: {country_medals['Bronze']}")
 
-        for country in matching_countries:
-            print(f"\nСтатистика для {country}:")
-            years = country_data[country]
-            first_year = min(years.keys(), key=int)
-            first_city = years[first_year]["city"]
+    write_output(args.output, result)
 
-            total_medals = {}
-            for year, data in years.items():
-                for medal_type, count in data["medals"].items():
-                    total_medals[year] = total_medals.get(year, 0) + count
+def process_total(args, countries_data):
+    country_medals = defaultdict(lambda: {'Gold': 0, 'Silver': 0, 'Bronze': 0})
 
-            if total_medals:
-                best_year = max(total_medals, key=total_medals.get)
-                best_count = total_medals[best_year]
-                worst_year = min(total_medals, key=total_medals.get)
-                worst_count = total_medals[worst_year]
+    for country, data in countries_data.items():
+        for year, medal, _, _ in data:
+            if year == args.year:
+                if medal == 'Gold':
+                    country_medals[country]['Gold'] += 1
+                elif medal == 'Silver':
+                    country_medals[country]['Silver'] += 1
+                elif medal == 'Bronze':
+                    country_medals[country]['Bronze'] += 1
 
-                avg_gold = sum(data["medals"]["Gold"] for data in years.values()) / len(years)
-                avg_silver = sum(data["medals"]["Silver"] for data in years.values()) / len(years)
-                avg_bronze = sum(data["medals"]["Bronze"] for data in years.values()) / len(years)
+    result = []
+    result.append(f"Статистика медалей для {args.year} Олімпіади:")
+    for country, medals in country_medals.items():
+        result.append(f"{country} - Золото: {medals['Gold']}, Срібло: {medals['Silver']}, Бронза: {medals['Bronze']}")
 
-                print(f"Перша участь: {first_year}, {first_city}")
-                print(f"Найуспішніша олімпіада: {best_year} ({best_count} медалей)")
-                print(f"Найневдаліша олімпіада: {worst_year} ({worst_count} медалей)")
-                print(f"Середня кількість медалей: Gold: {avg_gold:.2f}, Silver: {avg_silver:.2f}, Bronze: {avg_bronze:.2f}")
-            else:
-                print(f"Країна не здобула жодної медалі.")
-else:
-    print(f"Другий аргумент має бути -medals, -total, -overall або -interactive")
-    sys.exit(1)
+    write_output(args.output, result)
+
+def main():
+    parser = argparse.ArgumentParser(description="Олімпійські медалі: пошук та статистика")
+    parser.add_argument("file", help="Шлях до файлу з даними")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    medals_parser = subparsers.add_parser("medals", help="Отримати статистику медалей для країни та року")
+    medals_parser.add_argument("country", help="Країна (назва або код)")
+    medals_parser.add_argument("year", help="Рік Олімпіади")
+    medals_parser.add_argument("-output", help="Файл для виведення результатів")
+    medals_parser.set_defaults(func=process_medals)
+
+    total_parser = subparsers.add_parser("total", help="Отримати статистику медалей для всіх країн на певній Олімпіаді")
+    total_parser.add_argument("year", help="Рік Олімпіади")
+    total_parser.add_argument("-output", help="Файл для виведення результатів")
+    total_parser.set_defaults(func=process_total)
+
+    args = parser.parse_args()
+    countries_data = load_data(args.file)
+
+    args.func(args, countries_data)
+
+if __name__ == "__main__":
+    main()
